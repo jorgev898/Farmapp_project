@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
             Farmapp_projectTheme {
                     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                         Column (modifier = Modifier.padding(innerPadding)){
-                            LoginScreen()
+                            HomePage()
                     }
                 }
             }
