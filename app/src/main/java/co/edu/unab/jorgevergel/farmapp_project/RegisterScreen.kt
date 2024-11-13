@@ -1,6 +1,5 @@
 package co.edu.unab.jorgevergel.farmapp_project
 
-import android.content.Intent
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -18,15 +17,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
-fun LoginScreen(navController: NavController) {
+fun RegisterScreen(navController: NavController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var showResetPasswordDialog by remember { mutableStateOf(false) }
-    var resetEmail by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var profileImageUrl by remember { mutableStateOf("") }
+
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
+    val firestore = FirebaseFirestore.getInstance()
 
     Box(
         modifier = Modifier
@@ -41,7 +44,7 @@ fun LoginScreen(navController: NavController) {
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = "Iniciar sesión",
+                text = "Crear cuenta",
                 fontSize = 24.sp,
                 color = Color.Black,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -60,9 +63,40 @@ fun LoginScreen(navController: NavController) {
                         .padding(16.dp)
                 ) {
                     OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Nombre") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
                         label = { Text("Correo electrónico") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = { phone = it },
+                        label = { Text("Teléfono") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = profileImageUrl,
+                        onValueChange = { profileImageUrl = it },
+                        label = { Text("URL de Imagen de Perfil") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -79,32 +113,36 @@ fun LoginScreen(navController: NavController) {
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Spacer(modifier = Modifier.weight(1f))
-                        TextButton(onClick = { showResetPasswordDialog = true }) {
-                            Text("¿Olvidaste tu contraseña?", color = Color.Blue)
-                        }
-                    }
-
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
                         onClick = {
-                            auth.signInWithEmailAndPassword(email, password)
+                            auth.createUserWithEmailAndPassword(email, password)
                                 .addOnCompleteListener { task ->
                                     if (task.isSuccessful) {
-                                        Toast.makeText(context, "Inicio de sesión exitoso", Toast.LENGTH_SHORT).show()
-                                        // Redirigir a MainActivity
-                                        val intent = Intent(context, MainActivity::class.java)
-                                        context.startActivity(intent)
+                                        val userId = auth.currentUser?.uid
+                                        val user = hashMapOf(
+                                            "name" to name,
+                                            "email" to email,
+                                            "phone" to phone,
+                                            "profileImageUrl" to profileImageUrl
+                                        )
+
+                                        if (userId != null) {
+                                            firestore.collection("users").document(userId)
+                                                .set(user)
+                                                .addOnSuccessListener {
+                                                    Toast.makeText(context, "Registro exitoso", Toast.LENGTH_SHORT).show()
+                                                    navController.navigate("login")
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    Toast.makeText(context, "Error al guardar usuario: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                    Log.e("RegisterScreen", "Error al guardar en Firestore", e)
+                                                }
+                                        }
                                     } else {
                                         Toast.makeText(context, "Error: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
-                                        Log.e("LoginScreen", "Error de autenticación", task.exception)
+                                        Log.e("RegisterScreen", "Error de registro", task.exception)
                                     }
                                 }
                         },
@@ -116,68 +154,21 @@ fun LoginScreen(navController: NavController) {
                             contentColor = Color.White
                         )
                     ) {
-                        Text(text = "Iniciar sesión")
+                        Text(text = "Registrar")
                     }
-
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("¿No tienes una cuenta?")
-                        TextButton(onClick = { navController.navigate("register") }) {
-                            Text("Regístrate", color = Color.Blue)
+                        Text("¿Ya tienes una cuenta?")
+                        TextButton(onClick = { navController.navigate("login") }) {
+                            Text("Inicia sesión", color = Color.Blue)
                         }
                     }
                 }
             }
         }
-    }
-
-    // Dialogo para restablecer la contraseña
-    if (showResetPasswordDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetPasswordDialog = false },
-            title = { Text("Restablecer Contraseña") },
-            text = {
-                Column {
-                    Text("Introduce tu correo electrónico y te enviaremos un enlace para restablecer la contraseña.")
-                    OutlinedTextField(
-                        value = resetEmail,
-                        onValueChange = { resetEmail = it },
-                        label = { Text("Correo electrónico") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (resetEmail.isNotEmpty()) {
-                            auth.sendPasswordResetEmail(resetEmail)
-                                .addOnCompleteListener { task ->
-                                    if (task.isSuccessful) {
-                                        Toast.makeText(context, "Enlace de restablecimiento enviado", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "Error: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                    showResetPasswordDialog = false
-                                }
-                        } else {
-                            Toast.makeText(context, "Por favor ingresa un correo electrónico", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                ) {
-                    Text("Enviar enlace")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetPasswordDialog = false }) {
-                    Text("Cancelar")
-                }
-            }
-        )
     }
 }
